@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from 'react-query';
 import { journalsApi, proxyApi } from '../services/api';
 import { Journal } from '../types/journal';
-import { BookOpenIcon, ExternalLinkIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { BookOpenIcon, ArrowTopRightOnSquareIcon, ClockIcon } from '@heroicons/react/24/outline';
 import LoadingSpinner from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
 
@@ -186,7 +186,7 @@ const JournalDetail: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-3">
-              <ExternalLinkIcon className="h-5 w-5 text-gray-400" />
+              <ArrowTopRightOnSquareIcon className="h-5 w-5 text-gray-400" />
               <div>
                 <p className="text-sm font-medium text-gray-900">Last Updated</p>
                 <p className="text-sm text-gray-500">
@@ -209,7 +209,7 @@ const JournalDetail: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <ExternalLinkIcon className="h-4 w-4" />
+                  <ArrowTopRightOnSquareIcon className="h-4 w-4" />
                   Request Access
                 </>
               )}
