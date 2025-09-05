@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Veritabanı
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: libproxy
+      POSTGRES_USER: libproxy_user
+      POSTGRES_PASSWORD: libproxy_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - libproxy_network
+
+  # Redis (Session ve Cache için)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - libproxy_network
+
+  # Flask Backend API
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://libproxy_user:libproxy_pass@db:5432/libproxy
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET_KEY=your-secret-key-change-in-production
+    volumes:
+      - ./backend:/app
+      - ./proxy/configs:/app/proxy_configs
+    depends_on:
+      - db
+      - redis
+    networks:
+      - libproxy_network
+
+  # HAProxy (Dinamik Proxy)
+  haproxy:
+    image: haproxy:2.8
+    ports:
+      - "80:80"
+      - "8404:8404"  # HAProxy Stats
+    volumes:
+      - ./proxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./proxy/configs:/etc/haproxy/configs:ro
+    depends_on:
+      - backend
+    networks:
+      - libproxy_network
+
+  # React Frontend
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000/api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - libproxy_network
+
+volumes:
+  postgres_data:
+
+networks:
+  libproxy_network:
+    driver: bridge
