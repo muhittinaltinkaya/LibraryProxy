@@ -35,6 +35,21 @@ const AdminJournals: React.FC = () => {
     }
   );
 
+  const updateJournalMutation = useMutation(
+    ({ id, data }: { id: number; data: any }) => adminApi.updateJournal(id, data),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['admin-journals']);
+        setShowEditForm(false);
+        setEditingJournal(null);
+        toast.success('Journal updated successfully');
+      },
+      onError: (error: any) => {
+        toast.error(error.response?.data?.error || 'Failed to update journal');
+      },
+    }
+  );
+
   const deleteJournalMutation = useMutation(
     (id: number) => adminApi.deleteJournal(id),
     {
@@ -72,6 +87,19 @@ const AdminJournals: React.FC = () => {
   const handleEditJournal = (journal: any) => {
     setEditingJournal(journal);
     setShowEditForm(true);
+  };
+
+  const handleUpdateJournal = (journalData: any) => {
+    // Convert status to is_active
+    const processedData = {
+      ...journalData,
+      is_active: journalData.status === 'active'
+    };
+    delete processedData.status;
+    updateJournalMutation.mutate({
+      id: editingJournal.id,
+      data: processedData
+    });
   };
 
   const journals = journalsData?.journals || [];
@@ -269,142 +297,15 @@ const AdminJournals: React.FC = () => {
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 Edit Journal: {editingJournal.name}
               </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Journal Name
-                  </label>
-                  <input
-                    type="text"
-                    defaultValue={editingJournal.name}
-                    className="input w-full"
-                    placeholder="Journal Name"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Publisher
-                  </label>
-                  <input
-                    type="text"
-                    defaultValue={editingJournal.publisher || ''}
-                    className="input w-full"
-                    placeholder="Publisher"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Base URL
-                  </label>
-                  <input
-                    type="url"
-                    defaultValue={editingJournal.base_url}
-                    className="input w-full"
-                    placeholder="https://example.com"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Proxy Path
-                  </label>
-                  <input
-                    type="text"
-                    defaultValue={editingJournal.proxy_path}
-                    className="input w-full"
-                    placeholder="journal-path"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Access Level
-                  </label>
-                  <select
-                    defaultValue={editingJournal.access_level}
-                    className="input w-full"
-                  >
-                    <option value="public">Public</option>
-                    <option value="restricted">Restricted</option>
-                    <option value="admin">Admin Only</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Status
-                  </label>
-                  <select
-                    defaultValue={editingJournal.is_active ? 'active' : 'inactive'}
-                    className="input w-full"
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-                
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description
-                  </label>
-                  <textarea
-                    defaultValue={editingJournal.description || ''}
-                    className="input w-full h-20"
-                    placeholder="Journal description"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    ISSN
-                  </label>
-                  <input
-                    type="text"
-                    defaultValue={editingJournal.issn || ''}
-                    className="input w-full"
-                    placeholder="ISSN"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    E-ISSN
-                  </label>
-                  <input
-                    type="text"
-                    defaultValue={editingJournal.e_issn || ''}
-                    className="input w-full"
-                    placeholder="E-ISSN"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => {
-                    setShowEditForm(false);
-                    setEditingJournal(null);
-                  }}
-                  className="btn btn-secondary"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    // TODO: Implement update functionality
-                    toast.success('Journal updated successfully!');
-                    setShowEditForm(false);
-                    setEditingJournal(null);
-                    queryClient.invalidateQueries(['admin-journals']);
-                  }}
-                  className="btn btn-primary"
-                >
-                  Update Journal
-                </button>
-              </div>
+              <EditJournalForm 
+                journal={editingJournal}
+                onSubmit={handleUpdateJournal}
+                onCancel={() => {
+                  setShowEditForm(false);
+                  setEditingJournal(null);
+                }}
+                isLoading={updateJournalMutation.isLoading}
+              />
             </div>
           </div>
         </div>
@@ -650,6 +551,300 @@ const CreateJournalForm: React.FC<{
             </>
           ) : (
             'Create Journal'
+          )}
+        </button>
+      </div>
+    </form>
+  );
+};
+
+// Edit Journal Form Component
+const EditJournalForm: React.FC<{
+  journal: any;
+  onSubmit: (data: any) => void;
+  onCancel: () => void;
+  isLoading: boolean;
+}> = ({ journal, onSubmit, onCancel, isLoading }) => {
+  const [formData, setFormData] = useState({
+    name: journal.name || '',
+    slug: journal.slug || '',
+    publisher: journal.publisher || '',
+    base_url: journal.base_url || '',
+    proxy_path: journal.proxy_path || '',
+    access_level: journal.access_level || 'public',
+    status: journal.is_active ? 'active' : 'inactive',
+    description: journal.description || '',
+    issn: journal.issn || '',
+    e_issn: journal.e_issn || '',
+    subject_areas: Array.isArray(journal.subject_areas) ? journal.subject_areas.join(', ') : (journal.subject_areas || ''),
+    requires_auth: journal.requires_auth !== undefined ? journal.requires_auth : true,
+    auth_method: journal.auth_method || 'ip',
+    timeout: journal.timeout || 30
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Process subject_areas
+    const processedData = {
+      ...formData,
+      subject_areas: formData.subject_areas
+        .split(',')
+        .map((area: string) => area.trim())
+        .filter((area: string) => area.length > 0),
+      timeout: parseInt(formData.timeout.toString()) || 30
+    };
+    
+    onSubmit(processedData);
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    
+    if (type === 'checkbox') {
+      const checked = (e.target as HTMLInputElement).checked;
+      setFormData(prev => ({
+        ...prev,
+        [name]: checked
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Journal Name *
+          </label>
+          <input
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Journal Name"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Slug *
+          </label>
+          <input
+            type="text"
+            name="slug"
+            value={formData.slug}
+            onChange={handleChange}
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="journal-slug"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Publisher
+          </label>
+          <input
+            type="text"
+            name="publisher"
+            value={formData.publisher}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Publisher Name"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Base URL *
+          </label>
+          <input
+            type="url"
+            name="base_url"
+            value={formData.base_url}
+            onChange={handleChange}
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="https://example.com"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Proxy Path *
+          </label>
+          <input
+            type="text"
+            name="proxy_path"
+            value={formData.proxy_path}
+            onChange={handleChange}
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="journal-path"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Access Level
+          </label>
+          <select
+            name="access_level"
+            value={formData.access_level}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="public">Public</option>
+            <option value="restricted">Restricted</option>
+            <option value="admin">Admin Only</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Status
+          </label>
+          <select
+            name="status"
+            value={formData.status}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Auth Method
+          </label>
+          <select
+            name="auth_method"
+            value={formData.auth_method}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="ip">IP Authentication</option>
+            <option value="username">Username Authentication</option>
+            <option value="token">Token Authentication</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Timeout (seconds)
+          </label>
+          <input
+            type="number"
+            name="timeout"
+            value={formData.timeout}
+            onChange={handleChange}
+            min="1"
+            max="300"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="30"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            ISSN
+          </label>
+          <input
+            type="text"
+            name="issn"
+            value={formData.issn}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="e.g., 1234-5678"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            E-ISSN
+          </label>
+          <input
+            type="text"
+            name="e_issn"
+            value={formData.e_issn}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="e.g., 1476-4687"
+          />
+        </div>
+
+        <div className="md:col-span-2">
+          <label className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              name="requires_auth"
+              checked={formData.requires_auth}
+              onChange={handleChange}
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-sm font-medium text-gray-700">Requires Authentication</span>
+          </label>
+        </div>
+
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Description
+          </label>
+          <textarea
+            name="description"
+            value={formData.description}
+            onChange={handleChange}
+            rows={3}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Journal description..."
+          />
+        </div>
+
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Subject Areas
+          </label>
+          <input
+            type="text"
+            name="subject_areas"
+            value={formData.subject_areas}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="e.g., Science, Medicine, Technology (comma separated)"
+          />
+        </div>
+      </div>
+
+      <div className="flex justify-end space-x-3 mt-6">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="btn btn-secondary"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isLoading ? (
+            <>
+              <LoadingSpinner size="sm" />
+              Updating...
+            </>
+          ) : (
+            'Update Journal'
           )}
         </button>
       </div>

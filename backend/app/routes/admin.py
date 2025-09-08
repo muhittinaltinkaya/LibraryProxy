@@ -228,6 +228,13 @@ def create_journal():
         if Journal.query.filter_by(proxy_path=data['proxy_path']).first():
             return jsonify({'error': 'Proxy path already exists'}), 409
         
+        # Process subject_areas - ensure it's always a list
+        subject_areas = data.get('subject_areas', [])
+        if isinstance(subject_areas, str):
+            subject_areas = [subject_areas] if subject_areas.strip() else []
+        elif not isinstance(subject_areas, list):
+            subject_areas = []
+
         # Create journal
         journal = journal_service.create_journal(
             name=sanitize_string(data['name'], 200),
@@ -238,7 +245,7 @@ def create_journal():
             publisher=sanitize_string(data.get('publisher', ''), 200),
             issn=data.get('issn', ''),
             e_issn=data.get('e_issn', ''),
-            subject_areas=data.get('subject_areas', []),
+            subject_areas=subject_areas,
             access_level=data.get('access_level', 'public'),
             requires_auth=data.get('requires_auth', True),
             auth_method=data.get('auth_method', 'ip'),
@@ -246,9 +253,17 @@ def create_journal():
             timeout=data.get('timeout', 30)
         )
         
+        # Generate proxy URL for immediate access
+        proxy_url = journal.get_proxy_url(request.host)
+        
         return jsonify({
-            'message': 'Journal created successfully',
-            'journal': journal.to_dict()
+            'message': 'Journal created successfully and proxy configuration applied',
+            'journal': journal.to_dict(),
+            'proxy_url': proxy_url,
+            'access_info': {
+                'immediate_access': True,
+                'description': 'Journal is now accessible via proxy URL without additional configuration'
+            }
         }), 201
         
     except Exception as e:
@@ -285,6 +300,14 @@ def update_journal(journal_id):
         # Validate URL if provided
         if 'base_url' in data and not validate_url(data['base_url']):
             return jsonify({'error': 'Invalid base URL format'}), 400
+        
+        # Process subject_areas if provided
+        if 'subject_areas' in data:
+            subject_areas = data['subject_areas']
+            if isinstance(subject_areas, str):
+                data['subject_areas'] = [subject_areas] if subject_areas.strip() else []
+            elif not isinstance(subject_areas, list):
+                data['subject_areas'] = []
         
         # Update journal
         updated_journal = journal_service.update_journal(journal_id, **data)

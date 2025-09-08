@@ -182,20 +182,28 @@ const Journals: React.FC = () => {
                         }`}>
                           {journal.access_level}
                         </span>
-                        {journal.subject_areas && journal.subject_areas.length > 0 && (
-                          <div className="flex gap-1">
-                            {journal.subject_areas.slice(0, 3).map((area: string) => (
-                              <span key={area} className="badge badge-primary text-xs">
-                                {area}
-                              </span>
-                            ))}
-                            {journal.subject_areas.length > 3 && (
-                              <span className="text-xs text-gray-500">
-                                +{journal.subject_areas.length - 3} more
-                              </span>
-                            )}
-                          </div>
-                        )}
+                        {journal.subject_areas && (() => {
+                          const areas = Array.isArray(journal.subject_areas) 
+                            ? journal.subject_areas 
+                            : typeof journal.subject_areas === 'string' 
+                              ? [journal.subject_areas] 
+                              : [];
+                          
+                          return areas.length > 0 && (
+                            <div className="flex gap-1">
+                              {areas.slice(0, 3).map((area: string) => (
+                                <span key={area} className="badge badge-primary text-xs">
+                                  {area}
+                                </span>
+                              ))}
+                              {areas.length > 3 && (
+                                <span className="text-xs text-gray-500">
+                                  +{areas.length - 3} more
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                     <div className="ml-4">

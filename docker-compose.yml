@@ -33,9 +33,14 @@ services:
       - DATABASE_URL=postgresql://libproxy_user:libproxy_pass@db:5432/libproxy
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET_KEY=your-secret-key-change-in-production
+      - HAPROXY_SOCKET=/run/haproxy/admin.sock
+      - PROXY_CONFIG_DIR=/app/proxy_configs
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost,http://127.0.0.1
     volumes:
       - ./backend:/app
       - ./proxy/configs:/app/proxy_configs
+      - ./proxy:/app/haproxy_config
+      - haproxy_socket:/run/haproxy
     depends_on:
       - db
       - redis
@@ -49,7 +54,9 @@ services:
       - "80:80"
       - "8404:8404"  # HAProxy Stats
     volumes:
-      - ./proxy/haproxy-simple.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./proxy/haproxy-simple.cfg:/usr/local/etc/haproxy/haproxy.cfg
+      - ./backend/proxy_configs:/usr/local/etc/haproxy/configs
+      - haproxy_socket:/run/haproxy
     depends_on:
       - backend
     networks:
@@ -70,6 +77,7 @@ services:
 
 volumes:
   postgres_data:
+  haproxy_socket:
 
 networks:
   libproxy_network:

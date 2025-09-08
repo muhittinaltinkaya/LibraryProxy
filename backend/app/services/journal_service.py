@@ -20,7 +20,7 @@ class JournalService:
         return Journal.query.filter_by(slug=slug).first()
     
     def create_journal(self, name, slug, base_url, proxy_path, **kwargs):
-        """Create a new journal"""
+        """Create a new journal and automatically create its proxy configuration"""
         journal = Journal(
             name=name,
             slug=slug,
@@ -31,6 +31,18 @@ class JournalService:
         
         db.session.add(journal)
         db.session.commit()
+        
+        # Automatically update HAProxy configuration with all active journals
+        try:
+            success = self.proxy_service.update_main_haproxy_config()
+            if success:
+                # Reload HAProxy to apply changes
+                self.proxy_service.reload_haproxy()
+                print(f"HAProxy configuration automatically updated for new journal: {journal.slug}")
+            else:
+                print(f"Warning: Failed to update HAProxy config for journal {journal.slug}")
+        except Exception as e:
+            print(f"Warning: Failed to update HAProxy config for journal {journal.slug}: {str(e)}")
         
         return journal
     
@@ -56,6 +68,16 @@ class JournalService:
         journal.updated_at = datetime.utcnow()
         db.session.commit()
         
+        # Automatically update HAProxy configuration when journal is updated
+        try:
+            success = self.proxy_service.update_main_haproxy_config()
+            if success:
+                # Reload HAProxy to apply changes
+                self.proxy_service.reload_haproxy()
+                print(f"HAProxy configuration automatically updated for journal update: {journal.slug}")
+        except Exception as e:
+            print(f"Warning: Failed to update HAProxy config for journal update {journal.slug}: {str(e)}")
+        
         return journal
     
     def delete_journal(self, journal_id):
@@ -68,6 +90,16 @@ class JournalService:
         journal.is_active = False
         journal.updated_at = datetime.utcnow()
         db.session.commit()
+        
+        # Automatically update HAProxy configuration when journal is deleted
+        try:
+            success = self.proxy_service.update_main_haproxy_config()
+            if success:
+                # Reload HAProxy to apply changes
+                self.proxy_service.reload_haproxy()
+                print(f"HAProxy configuration automatically updated for journal deletion: {journal.slug}")
+        except Exception as e:
+            print(f"Warning: Failed to update HAProxy config for journal deletion {journal.slug}: {str(e)}")
         
         return journal
     
@@ -94,6 +126,36 @@ class JournalService:
             
             # Apply proxy configuration
             self.proxy_service.apply_proxy_config(proxy_config)
+            
+            return proxy_config
+            
+        except Exception as e:
+            db.session.rollback()
+            raise e
+    
+    def create_global_proxy_config(self, journal):
+        """Create a global proxy configuration for a journal that doesn't require user authentication"""
+        try:
+            # Create a global configuration name
+            config_name = f"{journal.slug}_global_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+            
+            # Generate HAProxy rule without user-specific authentication
+            haproxy_rule = self.proxy_service.generate_global_haproxy_rule(journal)
+            
+            # Create proxy config record without user_id (global access)
+            proxy_config = ProxyConfig(
+                journal_id=journal.id,
+                user_id=None,  # Global configuration, no specific user
+                config_name=config_name,
+                haproxy_rule=haproxy_rule,
+                expires_at=None  # Global configs don't expire
+            )
+            
+            db.session.add(proxy_config)
+            db.session.commit()
+            
+            # Apply proxy configuration
+            self.proxy_service.apply_global_proxy_config(proxy_config)
             
             return proxy_config
             

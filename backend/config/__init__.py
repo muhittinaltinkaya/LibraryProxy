@@ -17,7 +17,8 @@ class Config:
     REDIS_URL = os.environ.get('REDIS_URL') or 'redis://localhost:6379'
     
     # CORS
-    CORS_ORIGINS = ['http://localhost:3000', 'http://127.0.0.1:3000']
+    cors_origins_env = os.environ.get('CORS_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000')
+    CORS_ORIGINS = [origin.strip() for origin in cors_origins_env.split(',')]
     
     # Rate limiting
     RATELIMIT_STORAGE_URL = os.environ.get('REDIS_URL') or 'redis://localhost:6379'

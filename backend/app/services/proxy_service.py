@@ -11,8 +11,9 @@ class ProxyService:
     """Service for managing HAProxy configurations dynamically"""
     
     def __init__(self):
-        self.haproxy_socket = os.environ.get('HAPROXY_SOCKET', '/var/run/haproxy/admin.sock')
+        self.haproxy_socket = os.environ.get('HAPROXY_SOCKET', '/run/haproxy/admin.sock')
         self.config_dir = os.environ.get('PROXY_CONFIG_DIR', '/app/proxy_configs')
+        self.haproxy_config_path = '/app/haproxy_config/haproxy-simple.cfg'
         self.ensure_config_dir()
     
     def ensure_config_dir(self):
@@ -33,6 +34,18 @@ class ProxyService:
             rule_parts.append(f"use_backend {journal.slug}_backend if is_{journal.slug} user_{user.id}")
         else:
             rule_parts.append(f"use_backend {journal.slug}_backend if is_{journal.slug}")
+        
+        return "\n".join(rule_parts)
+    
+    def generate_global_haproxy_rule(self, journal):
+        """Generate HAProxy configuration rule for global journal access (no user authentication)"""
+        rule_parts = []
+        
+        # ACL for journal path
+        rule_parts.append(f"acl is_{journal.slug} path_beg /{journal.proxy_path}")
+        
+        # Use backend for this journal (no user authentication required)
+        rule_parts.append(f"use_backend {journal.slug}_backend if is_{journal.slug}")
         
         return "\n".join(rule_parts)
     
@@ -79,6 +92,38 @@ backend {journal.slug}_backend
             print(f"Failed to apply proxy config: {str(e)}")
             return False
     
+    def apply_global_proxy_config(self, proxy_config):
+        """Apply global proxy configuration to HAProxy (accessible to all users)"""
+        try:
+            # Generate backend configuration
+            journal = Journal.query.get(proxy_config.journal_id)
+            backend_config = self.generate_backend_config(journal)
+            
+            # Generate frontend rules for global access
+            frontend_rules = self.generate_global_haproxy_rule(journal)
+            
+            # Write backend configuration to file
+            backend_file = os.path.join(self.config_dir, f"{proxy_config.config_name}_backend.cfg")
+            with open(backend_file, 'w') as f:
+                f.write(backend_config)
+            
+            # Write frontend rules to file
+            frontend_file = os.path.join(self.config_dir, f"{proxy_config.config_name}_frontend.cfg")
+            with open(frontend_file, 'w') as f:
+                f.write(frontend_rules)
+            
+            # Update main HAProxy configuration with new rules
+            self.update_main_haproxy_config()
+            
+            # Reload HAProxy configuration
+            self.reload_haproxy()
+            
+            return True
+            
+        except Exception as e:
+            print(f"Failed to apply global proxy config: {str(e)}")
+            return False
+    
     def remove_proxy_config(self, proxy_config):
         """Remove proxy configuration from HAProxy"""
         try:
@@ -94,6 +139,150 @@ backend {journal.slug}_backend
             
         except Exception as e:
             print(f"Failed to remove proxy config: {str(e)}")
+            return False
+    
+    def generate_dynamic_haproxy_config(self):
+        """Generate complete HAProxy configuration with all active journals"""
+        try:
+            # Get all active journals directly from database
+            active_journals = Journal.query.filter_by(is_active=True).all()
+            
+            # Generate frontend ACL rules and use_backend rules
+            frontend_acls = []
+            frontend_backends = []
+            backend_configs = []
+            
+            for journal in active_journals:
+                # Add frontend ACL
+                frontend_acls.append(f"    acl is_{journal.slug} path_beg /{journal.proxy_path}")
+                frontend_backends.append(f"    use_backend {journal.slug}_backend if is_{journal.slug}")
+                
+                # Generate backend configuration
+                backend_config = self.generate_dynamic_backend_config(journal)
+                backend_configs.append(backend_config)
+            
+            # Generate complete HAProxy configuration
+            haproxy_config = f"""global
+    daemon
+    log stdout local0
+    stats timeout 30s
+
+defaults
+    mode http
+    log global
+    option httplog
+    option dontlognull
+    option forwardfor
+    timeout connect 5000
+    timeout client 50000
+    timeout server 50000
+
+# Stats page
+listen stats
+    bind *:8404
+    stats enable
+    stats uri /stats
+    stats refresh 30s
+    stats admin if TRUE
+
+# Frontend for LibProxy
+frontend libproxy_frontend
+    bind *:80
+    
+    # CORS headers for all responses
+    http-after-response set-header Access-Control-Allow-Origin "http://localhost:3000"
+    http-after-response set-header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    http-after-response set-header Access-Control-Allow-Headers "Content-Type, Authorization"
+    http-after-response set-header Access-Control-Allow-Credentials "true"
+    
+    # Handle preflight OPTIONS requests
+    acl is_options method OPTIONS
+    http-request return status 200 if is_options
+    
+    # Handle favicon.ico requests
+    acl is_favicon path /favicon.ico
+    http-request return status 204 if is_favicon
+    
+    # Dynamic journal proxy rules
+{chr(10).join(frontend_acls)}
+{chr(10).join(frontend_backends)}
+    
+    default_backend libproxy_backend
+
+# Backend for LibProxy API
+backend libproxy_backend
+    balance roundrobin
+    option httpchk GET /api/health
+    http-check expect status 200
+    
+    # Backend servers
+    server libproxy_api backend:5000 check
+
+# Dynamic backend configurations for journals
+{chr(10).join(backend_configs)}
+"""
+            
+            return haproxy_config
+            
+        except Exception as e:
+            print(f"Failed to generate dynamic HAProxy config: {str(e)}")
+            return None
+    
+    def generate_dynamic_backend_config(self, journal):
+        """Generate HAProxy backend configuration for a journal with CORS and path rewriting"""
+        # Extract host and port from URL
+        from urllib.parse import urlparse
+        parsed = urlparse(journal.base_url)
+        host = parsed.hostname
+        port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+        ssl_config = "ssl verify none" if parsed.scheme == 'https' else ""
+        
+        # Path rewriting logic
+        path_rewrite_rules = []
+        if journal.proxy_path:
+            # Handle root path: /proxy_path -> /
+            path_rewrite_rules.append(f'    http-request set-path "/" if {{ path -m str "/{journal.proxy_path}" }}')
+            # Handle sub paths: /proxy_path/xyz -> /xyz
+            path_rewrite_rules.append(f'    http-request set-path %[path,regsub(^/{journal.proxy_path}/,/)] if {{ path -m beg "/{journal.proxy_path}/" }}')
+        
+        backend_config = f"""
+backend {journal.slug}_backend
+    mode http
+    balance roundrobin
+{chr(10).join(path_rewrite_rules)}
+    # CORS headers for journal responses
+    http-after-response set-header Access-Control-Allow-Origin "http://localhost:3000"
+    http-after-response set-header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    http-after-response set-header Access-Control-Allow-Headers "Content-Type, Authorization"
+    http-after-response set-header Access-Control-Allow-Credentials "true"
+    server {journal.slug}_server {host}:{port} {ssl_config}
+    timeout server {journal.timeout}s"""
+        
+        # Add custom headers if configured
+        if journal.custom_headers:
+            for header, value in journal.custom_headers.items():
+                backend_config += f"\n    http-request set-header {header} {value}"
+        
+        return backend_config
+    
+    def update_main_haproxy_config(self):
+        """Update main HAProxy configuration with all active journals"""
+        try:
+            # Generate complete dynamic configuration
+            haproxy_config = self.generate_dynamic_haproxy_config()
+            
+            if not haproxy_config:
+                return False
+            
+            # Write the updated configuration
+            with open(self.haproxy_config_path, 'w') as f:
+                f.write(haproxy_config)
+            
+            print(f"HAProxy configuration updated with {Journal.query.filter_by(is_active=True).count()} active journals")
+            return True
+            
+        except Exception as e:
+            print(f"Failed to update main HAProxy config: {str(e)}")
             return False
     
     def reload_haproxy(self):

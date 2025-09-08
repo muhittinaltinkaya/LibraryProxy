@@ -41,7 +41,11 @@ def create_app(config_name=None):
     redis_client = redis.from_url(app.config['REDIS_URL'])
     
     # CORS configuration
-    CORS(app, origins=app.config['CORS_ORIGINS'])
+    CORS(app, 
+         origins=app.config['CORS_ORIGINS'],
+         supports_credentials=True,
+         allow_headers=['Content-Type', 'Authorization'],
+         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
     
     # Register blueprints
     from app.routes.auth import auth_bp

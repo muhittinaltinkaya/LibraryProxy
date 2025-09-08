@@ -173,7 +173,7 @@ def cleanup_expired_configs():
 @proxy_bp.route('/reload', methods=['POST'])
 @jwt_required()
 def reload_proxy():
-    """Reload HAProxy configuration"""
+    """Reload HAProxy configuration with dynamic journal configurations"""
     try:
         user_id = get_jwt_identity()
         user = User.query.get(user_id)
@@ -185,13 +185,20 @@ def reload_proxy():
         if not user.is_admin:
             return jsonify({'error': 'Admin access required'}), 403
         
-        success = proxy_service.reload_haproxy()
+        # Update HAProxy configuration with all active journals
+        success = proxy_service.update_main_haproxy_config()
         
         if not success:
-            return jsonify({'error': 'Failed to reload HAProxy'}), 500
+            return jsonify({'error': 'Failed to update HAProxy configuration'}), 500
+        
+        # Reload HAProxy
+        reload_success = proxy_service.reload_haproxy()
+        
+        if not reload_success:
+            return jsonify({'error': 'HAProxy configuration updated but reload failed'}), 500
         
         return jsonify({
-            'message': 'HAProxy configuration reloaded successfully'
+            'message': 'HAProxy configuration dynamically updated and reloaded successfully'
         }), 200
         
     except Exception as e:

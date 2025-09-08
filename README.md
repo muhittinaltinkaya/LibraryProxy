@@ -12,30 +12,39 @@ Bu proje, OpenAthens benzeri bir sistemin temel bileşenlerini oluşturmaya odak
 - ✅ Kullanıcı aktif/pasif durumu yönetimi
 
 ### Dergi Yönetimi
-- ✅ Dergi ekleme, düzenleme ve silme
+- ✅ Dergi ekleme, düzenleme ve silme (tam fonksiyonel)
 - ✅ Dergi kategorileri ve konu alanları
 - ✅ Erişim seviyeleri (public, restricted, admin)
 - ✅ Proxy yolu yapılandırması
+- ✅ ISSN/E-ISSN yönetimi
+- ✅ Yayıncı bilgileri
+- ✅ Timeout ve auth method ayarları
 
-### Proxy Sistemi
-- ✅ HAProxy ile dinamik proxy yönetimi
-- ✅ Dış dergi sitelerine proxy erişimi
+### Dinamik Proxy Sistemi
+- ✅ HAProxy ile tamamen dinamik proxy yönetimi
+- ✅ Otomatik HAProxy konfigürasyonu güncellemesi
+- ✅ Yeni dergi eklendiğinde anında erişim
+- ✅ Path rewriting ve CORS desteği
+- ✅ Dış dergi sitelerine seamless proxy erişimi
 - ✅ SSL/HTTPS desteği
-- ✅ Path-based routing
+- ✅ Health check ve failover
 
 ### Admin Paneli
-- ✅ Kullanıcı yönetimi
-- ✅ Dergi yönetimi
-- ✅ Erişim logları
-- ✅ Sistem istatistikleri
+- ✅ Kullanıcı yönetimi (ekleme, düzenleme, şifre güncelleme)
+- ✅ Dergi yönetimi (tüm alanları düzenlenebilir)
+- ✅ Erişim logları ve analytics
+- ✅ Sistem istatistikleri ve dashboard
+- ✅ Real-time proxy konfigürasyonu yönetimi
 
 ## 🏗️ Sistem Mimarisi
 
 ### Ana Bileşenler
-1. **Kimlik Doğrulama Katmanı** - Kullanıcı girişi ve yetkilendirme
-2. **Dinamik Proxy Yönetim Katmanı** - HAProxy ile dinamik proxy oluşturma
-3. **Veri Tabanı** - Kullanıcı, dergi ve erişim logları
-4. **Admin Paneli** - Sistem yönetimi
+1. **Kimlik Doğrulama Katmanı** - JWT tabanlı kullanıcı girişi ve yetkilendirme
+2. **Dinamik Proxy Yönetim Katmanı** - HAProxy ile otomatik proxy konfigürasyonu
+3. **Veri Tabanı** - Kullanıcı, dergi ve erişim logları (PostgreSQL)
+4. **Cache Katmanı** - Redis ile session ve rate limiting
+5. **Admin Paneli** - React tabanlı sistem yönetimi arayüzü
+6. **Analytics Sistemi** - Erişim logları ve kullanım istatistikleri
 
 ### Teknoloji Stack
 - **Backend**: Python Flask + SQLAlchemy
@@ -123,10 +132,16 @@ docker-compose exec backend flask db upgrade
 - **Health Check**: http://localhost:5001/api/health
 
 ### Proxy Erişimi
-- **Nature**: http://localhost/nature
-- **Science**: http://localhost/science
-- **Lancet**: http://localhost/lancet
-- **JAMA**: http://localhost/jama
+Sistemde kayıtlı olan tüm aktif dergiler dinamik olarak proxy üzerinden erişilebilir:
+- **Format**: http://localhost/{proxy_path}
+- **Örnekler**:
+  - **Nature**: http://localhost/nature
+  - **Science**: http://localhost/science
+  - **Lancet**: http://localhost/lancet
+  - **JAMA**: http://localhost/jama
+  - **DSpace**: http://localhost/dspace
+
+**Not**: Yeni dergi eklendiğinde otomatik olarak proxy konfigürasyonu oluşturulur ve anında erişim sağlanır.
 
 ## 📚 API Dokümantasyonu
 
@@ -149,9 +164,17 @@ docker-compose exec backend flask db upgrade
 - `PUT /api/admin/users/{id}/password` - Şifre güncelleme
 - `GET /api/admin/journals` - Dergi listesi (admin)
 - `POST /api/admin/journals` - Dergi oluşturma
-- `PUT /api/admin/journals/{id}` - Dergi güncelleme
+- `PUT /api/admin/journals/{id}` - Dergi güncelleme (tüm alanlar)
+- `DELETE /api/admin/journals/{id}` - Dergi silme
 - `GET /api/admin/stats` - Sistem istatistikleri
 - `GET /api/admin/access-logs` - Erişim logları
+
+### Proxy API
+- `POST /api/proxy/generate` - Proxy konfigürasyonu oluşturma
+- `POST /api/proxy/reload` - HAProxy yeniden yükleme
+- `DELETE /api/proxy/{id}` - Proxy konfigürasyonu silme
+- `GET /api/proxy/status` - Proxy durumu
+- `POST /api/proxy/cleanup` - Süresi dolmuş konfigürasyonları temizleme
 
 ## 🔒 Güvenlik
 
@@ -202,10 +225,32 @@ docker-compose exec db psql -U libproxy_user -d libproxy
 
 ## 📝 Kullanım
 
+### Temel Kullanım Adımları
+
 1. **Admin olarak giriş yapın** (admin/admin123)
-2. **Kullanıcıları yönetin** - Admin panelinde kullanıcı ekleyin/düzenleyin
-3. **Dergileri yönetin** - Dergi ekleyin ve proxy yollarını yapılandırın
-4. **Proxy erişimini test edin** - http://localhost/{proxy_path} ile dergi içeriklerine erişin
+2. **Kullanıcıları yönetin** - Admin panelinde kullanıcı ekleyin/düzenleyin/şifre güncelleyin
+3. **Dergileri yönetin** - Dergi ekleyin ve tüm alanları düzenleyin:
+   - Dergi adı, slug, publisher bilgileri
+   - Base URL ve proxy path
+   - ISSN/E-ISSN numaraları
+   - Subject areas (konu alanları)
+   - Access level ve authentication ayarları
+   - Timeout ve diğer proxy ayarları
+4. **Proxy erişimini test edin** - http://localhost/{proxy_path} ile dergi içeriklerine anında erişin
+
+### Dinamik Proxy Özelliği
+
+- ✅ Yeni dergi eklediğinizde HAProxy konfigürasyonu otomatik güncellenir
+- ✅ Dergi bilgilerini düzenlediğinizde proxy ayarları anında yansır
+- ✅ Dergi sildiğinizde proxy erişimi otomatik kaldırılır
+- ✅ Manuel HAProxy konfigürasyonu gerektirmez
+
+### Admin Paneli Özellikleri
+
+- **Dashboard**: Sistem istatistikleri ve genel bakış
+- **User Management**: Kullanıcı ekleme, düzenleme, aktif/pasif yapma
+- **Journal Management**: Dergi yönetimi (tüm alanlar düzenlenebilir)
+- **Analytics**: Erişim logları ve kullanım raporları
 
 ## 🐛 Sorun Giderme
 
@@ -216,7 +261,14 @@ docker-compose restart
 
 ### Logları Görüntüleme
 ```bash
+# Tüm servisler
+docker-compose logs -f
+
+# Belirli servis
 docker-compose logs -f [service_name]
+
+# Örnek: HAProxy logları
+docker-compose logs -f haproxy
 ```
 
 ### Veritabanını Sıfırlama
@@ -225,6 +277,30 @@ docker-compose down -v
 docker-compose up -d
 docker-compose exec backend flask db upgrade
 ```
+
+### HAProxy Konfigürasyon Sorunları
+```bash
+# HAProxy konfigürasyonunu manuel yenile
+curl -X POST http://localhost:5001/api/proxy/reload
+
+# HAProxy durumunu kontrol et
+docker-compose logs haproxy
+
+# HAProxy konfigürasyon dosyasını kontrol et
+cat proxy/haproxy-simple.cfg
+```
+
+### Yaygın Sorunlar ve Çözümleri
+
+1. **Journal edit etmek işe yaramıyor**
+   - ✅ Bu sorun çözüldü! Artık tüm journal alanları düzenlenebilir.
+
+2. **Yeni dergi eklendikten sonra proxy erişimi çalışmıyor**
+   - ✅ Bu sorun çözüldü! Dinamik konfigürasyon otomatik çalışır.
+
+3. **CORS hataları**
+   - CORS ayarları docker-compose.yml'de yapılandırıldı
+   - Frontend ve backend arasında tam uyumluluk sağlandı
 
 ## 📄 Lisans
 
