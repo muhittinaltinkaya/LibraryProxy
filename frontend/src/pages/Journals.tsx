@@ -112,7 +112,7 @@ const Journals: React.FC = () => {
                   className="input"
                 >
                   <option value="">All subjects</option>
-                  {subjectAreas?.map((area) => (
+                  {subjectAreas?.map((area: string) => (
                     <option key={area} value={area}>
                       {area}
                     </option>
@@ -157,7 +157,7 @@ const Journals: React.FC = () => {
               </p>
             </div>
             <div className="divide-y divide-gray-200">
-              {journals.map((journal) => (
+              {journals.map((journal: Journal) => (
                 <div key={journal.id} className="p-6 hover:bg-gray-50">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -184,7 +184,7 @@ const Journals: React.FC = () => {
                         </span>
                         {journal.subject_areas && journal.subject_areas.length > 0 && (
                           <div className="flex gap-1">
-                            {journal.subject_areas.slice(0, 3).map((area) => (
+                            {journal.subject_areas.slice(0, 3).map((area: string) => (
                               <span key={area} className="badge badge-primary text-xs">
                                 {area}
                               </span>

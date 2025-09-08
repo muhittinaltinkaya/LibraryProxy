@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { journalsApi } from '../services/api';
 import { BookOpenIcon, ClockIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { Journal } from '../types/journal';
 
 const Dashboard: React.FC = () => {
   const { data: journalsData, isLoading: journalsLoading } = useQuery(
@@ -30,8 +31,8 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  const journals = journalsData?.journals || [];
-  const areas = subjectAreas || [];
+  const journals: Journal[] = journalsData?.journals || [];
+  const areas: string[] = subjectAreas || [];
 
   return (
     <div className="space-y-6">

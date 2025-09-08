@@ -113,7 +113,7 @@ def validate_journal_slug(slug: str) -> Dict[str, Any]:
         return {'valid': False, 'message': 'Slug can only contain lowercase letters, numbers, and hyphens'}
     
     # Check if starts and ends with letter or number
-    if not re.match(r'^[a-z0-9]', slug) or not re.match(r'[a-z0-9]$', slug):
+    if not re.match(r'^[a-z0-9]', slug) or not re.search(r'[a-z0-9]$', slug):
         return {'valid': False, 'message': 'Slug must start and end with a letter or number'}
     
     # Check for consecutive hyphens

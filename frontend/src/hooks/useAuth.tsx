@@ -10,6 +10,7 @@ interface AuthContextType {
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
   updateProfile: (data: Partial<User>) => Promise<void>;
+  setUser: (user: User | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,23 +30,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Check if user is logged in on mount
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      // Verify token and get user data
-      authApi.getProfile()
-        .then((response) => {
+    const checkAuth = async () => {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        try {
+          // Verify token and get user data
+          const response = await authApi.getProfile();
           setUser(response.data.user);
-        })
-        .catch(() => {
+        } catch (error) {
+          console.log('Token verification failed:', error);
+          // Clear invalid tokens
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    } else {
+          setUser(null);
+        }
+      }
       setIsLoading(false);
-    }
+    };
+
+    checkAuth();
   }, []);
 
   const login = async (credentials: LoginCredentials) => {
@@ -104,6 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     register,
     logout,
     updateProfile,
+    setUser,
   };
 
   return (

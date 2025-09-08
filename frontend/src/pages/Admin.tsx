@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { CogIcon, UsersIcon, BookOpenIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { CogIcon, UsersIcon, BookOpenIcon, ChartBarIcon, PresentationChartBarIcon } from '@heroicons/react/24/outline';
 import AdminDashboard from '../components/admin/AdminDashboard';
 import AdminUsers from '../components/admin/AdminUsers';
 import AdminJournals from '../components/admin/AdminJournals';
 import AdminStats from '../components/admin/AdminStats';
+import AnalyticsDashboard from '../components/admin/AnalyticsDashboard';
 
 const Admin: React.FC = () => {
   const location = useLocation();
 
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: ChartBarIcon },
+    { name: 'Analytics', href: '/admin/analytics', icon: PresentationChartBarIcon },
     { name: 'Users', href: '/admin/users', icon: UsersIcon },
     { name: 'Journals', href: '/admin/journals', icon: BookOpenIcon },
     { name: 'Settings', href: '/admin/settings', icon: CogIcon },
@@ -55,6 +57,7 @@ const Admin: React.FC = () => {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <Routes>
           <Route index element={<AdminDashboard />} />
+          <Route path="analytics" element={<AnalyticsDashboard />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="journals" element={<AdminJournals />} />
           <Route path="settings" element={<AdminStats />} />

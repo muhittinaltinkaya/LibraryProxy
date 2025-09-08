@@ -20,13 +20,14 @@ class User(db.Model):
     # Relationships
     access_logs = db.relationship('AccessLog', backref='user', lazy='dynamic')
     
-    def __init__(self, username, email, password, first_name, last_name, is_admin=False):
+    def __init__(self, username, email, password, first_name='', last_name='', is_admin=False, is_active=True):
         self.username = username
         self.email = email
         self.set_password(password)
         self.first_name = first_name
         self.last_name = last_name
         self.is_admin = is_admin
+        self.is_active = is_active
     
     def set_password(self, password):
         """Hash and set password"""
@@ -38,8 +39,8 @@ class User(db.Model):
     
     def generate_tokens(self):
         """Generate JWT access and refresh tokens"""
-        access_token = create_access_token(identity=self.id)
-        refresh_token = create_refresh_token(identity=self.id)
+        access_token = create_access_token(identity=str(self.id))
+        refresh_token = create_refresh_token(identity=str(self.id))
         return {
             'access_token': access_token,
             'refresh_token': refresh_token

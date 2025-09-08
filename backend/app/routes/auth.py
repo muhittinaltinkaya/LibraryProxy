@@ -20,6 +20,7 @@ def login():
     """User login endpoint"""
     try:
         data = request.get_json()
+        print(f"Login request data: {data}")  # Debug log
         
         if not data:
             return jsonify({'error': 'No data provided'}), 400
@@ -34,10 +35,10 @@ def login():
         user = auth_service.authenticate_user(username, password)
         
         if not user:
-            return jsonify({'error': 'Invalid credentials'}), 401
+            return jsonify({'error': 'Hatalı kullanıcı adı veya şifre'}), 401
         
         if not user.is_active:
-            return jsonify({'error': 'Account is deactivated'}), 401
+            return jsonify({'error': 'Hesabınız deaktif edilmiş'}), 401
         
         # Update last login
         user.update_last_login()

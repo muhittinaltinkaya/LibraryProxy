@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = 'http://localhost:5001/api';
 
 // Create axios instance
 const api = axios.create({
@@ -13,6 +13,7 @@ const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
+    console.log('API Request:', config.method?.toUpperCase(), config.url, config.data); // Debug log
     const token = localStorage.getItem('access_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -28,6 +29,8 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    console.log('API Error:', error.response?.status, error.response?.data, error.config?.url); // Debug log
+    
     const originalRequest = error.config;
 
     if (error.response?.status === 401 && !originalRequest._retry) {
@@ -140,7 +143,17 @@ export const adminApi = {
     search?: string;
   }) => api.get('/admin/users', { params }),
   
+  createUser: (data: any) => api.post('/admin/users', data),
+  
   updateUser: (id: number, data: any) => api.put(`/admin/users/${id}`, data),
+  
+  getJournals: (params?: {
+    page?: number;
+    per_page?: number;
+    search?: string;
+    subject_area?: string;
+    access_level?: string;
+  }) => api.get('/admin/journals', { params }),
   
   createJournal: (data: any) => api.post('/admin/journals', data),
   
@@ -156,6 +169,70 @@ export const adminApi = {
     user_id?: number;
     journal_id?: number;
   }) => api.get('/admin/access-logs', { params }),
+  
+  updateUserPassword: (userId: number, password: string) => 
+    api.put(`/admin/users/${userId}/password`, { password }),
+};
+
+// Analytics API
+export const analyticsApi = {
+  getDashboardStats: (params?: {
+    start_date?: string;
+    end_date?: string;
+  }) => api.get('/analytics/dashboard', { params }),
+  
+  getResourceReport: (params?: {
+    start_date?: string;
+    end_date?: string;
+    limit?: number;
+  }) => api.get('/analytics/resources', { params }),
+  
+  getUserReport: (params?: {
+    start_date?: string;
+    end_date?: string;
+    limit?: number;
+  }) => api.get('/analytics/users', { params }),
+  
+  getDepartmentReport: (params?: {
+    start_date?: string;
+    end_date?: string;
+  }) => api.get('/analytics/departments', { params }),
+  
+  getGeographicReport: (params?: {
+    start_date?: string;
+    end_date?: string;
+  }) => api.get('/analytics/geographic', { params }),
+  
+  getFailureAnalysis: (params?: {
+    start_date?: string;
+    end_date?: string;
+  }) => api.get('/analytics/failures', { params }),
+  
+  getTurnAwayAnalysis: (params?: {
+    start_date?: string;
+    end_date?: string;
+  }) => api.get('/analytics/turn-aways', { params }),
+  
+  getBreakdownReport: (params?: {
+    field: string;
+    start_date?: string;
+    end_date?: string;
+  }) => api.get('/analytics/breakdown', { params }),
+  
+  getAnalyticsLogs: (params?: {
+    page?: number;
+    per_page?: number;
+    start_date?: string;
+    end_date?: string;
+    user_id?: number;
+    resource_name?: string;
+  }) => api.get('/analytics/logs', { params }),
+  
+  exportData: (params?: {
+    type: string;
+    start_date?: string;
+    end_date?: string;
+  }) => api.get('/analytics/export', { params }),
 };
 
 export default api;

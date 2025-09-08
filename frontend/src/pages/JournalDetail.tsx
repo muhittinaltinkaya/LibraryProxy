@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation } from 'react-query';
-import { journalsApi, proxyApi } from '../services/api';
+import { useQuery } from 'react-query';
+import { journalsApi } from '../services/api';
 import { Journal } from '../types/journal';
 import { BookOpenIcon, ArrowTopRightOnSquareIcon, ClockIcon } from '@heroicons/react/24/outline';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -21,26 +21,19 @@ const JournalDetail: React.FC = () => {
     }
   );
 
-  const requestAccessMutation = useMutation(
-    () => journalsApi.requestAccess(Number(id)),
-    {
-      onSuccess: (response) => {
-        toast.success('Access granted! You can now access the journal.');
-        // Open the journal in a new tab
-        window.open(response.data.access_url, '_blank');
-      },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.error || 'Failed to request access');
-      },
-    }
-  );
-
   const handleRequestAccess = async () => {
     if (!journalData) return;
     
     setIsRequestingAccess(true);
     try {
-      await requestAccessMutation.mutateAsync();
+      // Generate proxy URL
+      const proxyUrl = `http://localhost:80/${journalData.proxy_path}`;
+      
+      // Open the journal content in a new tab
+      window.open(proxyUrl, '_blank');
+      toast.success('Opening journal content in new tab');
+    } catch (error) {
+      toast.error('Failed to open journal content');
     } finally {
       setIsRequestingAccess(false);
     }
@@ -205,12 +198,12 @@ const JournalDetail: React.FC = () => {
               {isRequestingAccess ? (
                 <>
                   <LoadingSpinner size="sm" />
-                  Requesting Access...
+                  Opening Journal...
                 </>
               ) : (
                 <>
                   <ArrowTopRightOnSquareIcon className="h-4 w-4" />
-                  Request Access
+                  View Journal Content
                 </>
               )}
             </button>

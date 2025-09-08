@@ -7,7 +7,7 @@ from app.models.proxy_config import ProxyConfig
 from app.models.access_log import AccessLog
 from app.services.journal_service import JournalService
 from app.services.proxy_service import ProxyService
-from app.utils.validators import validate_journal_slug, validate_url, sanitize_string
+from app.utils.validators import validate_journal_slug, validate_url, sanitize_string, validate_password
 
 admin_bp = Blueprint('admin', __name__)
 journal_service = JournalService()
@@ -27,42 +27,87 @@ def admin_required(f):
     decorated_function.__name__ = f.__name__
     return decorated_function
 
-@admin_bp.route('/users', methods=['GET'])
+@admin_bp.route('/users', methods=['GET', 'POST'])
 @jwt_required()
 @admin_required
 def get_users():
-    """Get all users (admin only)"""
-    try:
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 20, type=int)
-        search = request.args.get('search', '')
-        
-        query = User.query
-        
-        if search:
-            query = query.filter(
-                User.username.ilike(f'%{search}%') |
-                User.email.ilike(f'%{search}%') |
-                User.first_name.ilike(f'%{search}%') |
-                User.last_name.ilike(f'%{search}%')
+    """Get all users or create new user (admin only)"""
+    if request.method == 'GET':
+        try:
+            page = request.args.get('page', 1, type=int)
+            per_page = request.args.get('per_page', 20, type=int)
+            search = request.args.get('search', '')
+            
+            query = User.query
+            
+            if search:
+                query = query.filter(
+                    User.username.ilike(f'%{search}%') |
+                    User.email.ilike(f'%{search}%') |
+                    User.first_name.ilike(f'%{search}%') |
+                    User.last_name.ilike(f'%{search}%')
+                )
+            
+            users = query.paginate(page=page, per_page=per_page, error_out=False)
+            
+            return jsonify({
+                'users': [user.to_dict() for user in users.items],
+                'pagination': {
+                    'page': users.page,
+                    'pages': users.pages,
+                    'per_page': users.per_page,
+                    'total': users.total,
+                    'has_next': users.has_next,
+                    'has_prev': users.has_prev
+                }
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': 'Failed to get users', 'details': str(e)}), 500
+    
+    elif request.method == 'POST':
+        try:
+            data = request.get_json()
+            
+            if not data:
+                return jsonify({'error': 'No data provided'}), 400
+            
+            # Validate required fields
+            required_fields = ['username', 'email', 'password']
+            for field in required_fields:
+                if not data.get(field):
+                    return jsonify({'error': f'{field} is required'}), 400
+            
+            # Check if username already exists
+            if User.query.filter_by(username=data['username']).first():
+                return jsonify({'error': 'Username already exists'}), 400
+            
+            # Check if email already exists
+            if User.query.filter_by(email=data['email']).first():
+                return jsonify({'error': 'Email already exists'}), 400
+            
+            # Create new user
+            user = User(
+                username=data['username'],
+                email=data['email'],
+                password=data['password'],
+                first_name=data.get('first_name', ''),
+                last_name=data.get('last_name', ''),
+                is_admin=data.get('is_admin', False),
+                is_active=data.get('is_active', True)
             )
-        
-        users = query.paginate(page=page, per_page=per_page, error_out=False)
-        
-        return jsonify({
-            'users': [user.to_dict() for user in users.items],
-            'pagination': {
-                'page': users.page,
-                'pages': users.pages,
-                'per_page': users.per_page,
-                'total': users.total,
-                'has_next': users.has_next,
-                'has_prev': users.has_prev
-            }
-        }), 200
-        
-    except Exception as e:
-        return jsonify({'error': 'Failed to get users', 'details': str(e)}), 500
+            
+            db.session.add(user)
+            db.session.commit()
+            
+            return jsonify({
+                'message': 'User created successfully',
+                'user': user.to_dict()
+            }), 201
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': 'Failed to create user', 'details': str(e)}), 500
 
 @admin_bp.route('/users/<int:user_id>', methods=['PUT'])
 @jwt_required()
@@ -96,6 +141,58 @@ def update_user(user_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': 'Failed to update user', 'details': str(e)}), 500
+
+@admin_bp.route('/journals', methods=['GET'])
+@jwt_required()
+@admin_required
+def get_journals():
+    """Get list of journals (admin only)"""
+    try:
+        # Get query parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        search = request.args.get('search', '')
+        subject_area = request.args.get('subject_area', '')
+        access_level = request.args.get('access_level', '')
+        
+        # Build query
+        query = Journal.query
+        
+        # Apply filters
+        if search:
+            query = query.filter(
+                Journal.name.ilike(f'%{search}%') |
+                Journal.description.ilike(f'%{search}%') |
+                Journal.publisher.ilike(f'%{search}%')
+            )
+        
+        if subject_area:
+            query = query.filter(Journal.subject_areas.contains([subject_area]))
+        
+        if access_level:
+            query = query.filter(Journal.access_level == access_level)
+        
+        # Paginate results
+        journals = query.paginate(
+            page=page,
+            per_page=per_page,
+            error_out=False
+        )
+        
+        return jsonify({
+            'journals': [journal.to_dict() for journal in journals.items],
+            'pagination': {
+                'page': journals.page,
+                'pages': journals.pages,
+                'per_page': journals.per_page,
+                'total': journals.total,
+                'has_next': journals.has_next,
+                'has_prev': journals.has_prev
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': 'Failed to get journals', 'details': str(e)}), 500
 
 @admin_bp.route('/journals', methods=['POST'])
 @jwt_required()
@@ -313,3 +410,44 @@ def get_access_logs():
         
     except Exception as e:
         return jsonify({'error': 'Failed to get access logs', 'details': str(e)}), 500
+
+@admin_bp.route('/users/<int:user_id>/password', methods=['PUT'])
+@jwt_required()
+def update_user_password(user_id):
+    """Update user password (admin only)"""
+    try:
+        # Check if current user is admin
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        if not current_user or not current_user.is_admin:
+            return jsonify({'error': 'Admin access required'}), 403
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        new_password = data.get('password')
+        if not new_password:
+            return jsonify({'error': 'Password is required'}), 400
+        
+        # Validate password strength
+        password_validation = validate_password(new_password)
+        if not password_validation['valid']:
+            return jsonify({'error': password_validation['message']}), 400
+        
+        # Get target user
+        target_user = User.query.get(user_id)
+        if not target_user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Update password
+        target_user.set_password(new_password)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Password updated successfully'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to update password', 'details': str(e)}), 500

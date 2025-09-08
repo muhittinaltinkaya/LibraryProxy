@@ -48,11 +48,15 @@ def create_app(config_name=None):
     from app.routes.journals import journals_bp
     from app.routes.proxy import proxy_bp
     from app.routes.admin import admin_bp
+    from app.routes.health import health_bp
+    from app.routes.analytics import analytics_bp
     
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(journals_bp, url_prefix='/api/journals')
     app.register_blueprint(proxy_bp, url_prefix='/api/proxy')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
+    app.register_blueprint(health_bp, url_prefix='/api')
+    app.register_blueprint(analytics_bp, url_prefix='/api/analytics')
     
     # Error handlers
     @app.errorhandler(404)

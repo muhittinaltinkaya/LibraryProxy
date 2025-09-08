@@ -10,7 +10,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, setUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
   const {
@@ -21,12 +21,19 @@ const Login: React.FC = () => {
 
   const loginMutation = useMutation(authApi.login, {
     onSuccess: async (response) => {
-      await login(response.data);
+      const { access_token, refresh_token, user: userData } = response.data;
+      
+      localStorage.setItem('access_token', access_token);
+      localStorage.setItem('refresh_token', refresh_token);
+      setUser(userData);
+      
       toast.success('Login successful!');
       navigate('/');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Login failed');
+      const errorMessage = error.response?.data?.error || 'Giriş başarısız';
+      toast.error(errorMessage);
+      console.log('Login failed:', error);
     },
   });
 
@@ -34,6 +41,9 @@ const Login: React.FC = () => {
     setIsLoading(true);
     try {
       await loginMutation.mutateAsync(data);
+    } catch (error) {
+      // Error is already handled by onError in useMutation
+      console.log('Login error:', error);
     } finally {
       setIsLoading(false);
     }
