@@ -77,6 +77,8 @@ services:
       - "3000:3000"
     environment:
       - REACT_APP_API_URL=http://80.251.40.216:5001/api
+    volumes:
+      - ./frontend/public/config.js:/app/public/config.js
     networks:
       - libproxy_network
     restart: unless-stopped

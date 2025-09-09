@@ -43,6 +43,10 @@ docker-compose -f docker-compose.prod.yml ps
 echo "📊 Running database migrations..."
 docker-compose -f docker-compose.prod.yml exec -T backend flask db upgrade
 
+# Create/update admin user
+echo "👤 Creating/updating admin user..."
+docker-compose -f docker-compose.prod.yml exec -T backend python /app/create_admin_user.py
+
 # Show logs
 echo "📋 Showing recent logs..."
 docker-compose -f docker-compose.prod.yml logs --tail=50

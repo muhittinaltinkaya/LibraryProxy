@@ -63,6 +63,27 @@ SECRET_KEY=your-very-strong-secret-key-2024
 ./deploy.sh
 ```
 
+### 5. Admin Giriş Sorunu Çözme (Gerekirse)
+
+Eğer admin kullanıcısı ile giriş yapamıyorsanız:
+
+```bash
+# Admin giriş sorununu çöz
+./fix_admin_login.sh
+```
+
+### 6. Frontend API URL Sorunu Çözme (Gerekirse)
+
+Eğer frontend hala localhost:5001'e istek gönderiyorsa:
+
+```bash
+# Hızlı düzeltme (önerilen)
+./quick_fix_frontend.sh
+
+# Veya tam yeniden build
+./rebuild_frontend.sh
+```
+
 ## 🌐 Erişim URL'leri
 
 Deployment tamamlandıktan sonra:
