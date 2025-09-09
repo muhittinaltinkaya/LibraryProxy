@@ -24,7 +24,8 @@ def check_database():
             print("🔍 Veritabanı bağlantısı kontrol ediliyor...")
             
             # Veritabanı bağlantısını test et
-            db.engine.execute('SELECT 1')
+            with db.engine.connect() as conn:
+                conn.execute(db.text('SELECT 1'))
             print("✅ Veritabanı bağlantısı başarılı!")
             
             # Kullanıcıları listele
