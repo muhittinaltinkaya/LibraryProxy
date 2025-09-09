@@ -26,8 +26,9 @@ const JournalDetail: React.FC = () => {
     
     setIsRequestingAccess(true);
     try {
-      // Generate proxy URL
-      const proxyUrl = `http://localhost:80/${journalData.proxy_path}`;
+      // Generate proxy URL using production server IP
+      const baseUrl = window.APP_CONFIG?.API_URL?.replace('/api', '').replace(':5001', '') || 'http://80.251.40.216';
+      const proxyUrl = `${baseUrl}/${journalData.proxy_path}`;
       
       // Open the journal content in a new tab
       window.open(proxyUrl, '_blank');
