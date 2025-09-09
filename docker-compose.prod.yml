@@ -66,18 +66,17 @@ services:
       - libproxy_network
     restart: unless-stopped
 
-  # React Frontend
+  # React Frontend (Production)
   frontend:
     build: 
       context: ./frontend
+      dockerfile: Dockerfile.prod
       args:
         - REACT_APP_API_URL=http://80.251.40.216:5001/api
     ports:
-      - "3000:3000"
-    environment:
-      - REACT_APP_API_URL=http://80.251.40.216:5001/api
+      - "3000:80"
     volumes:
-      - ./frontend/public/config.js:/app/public/config.js
+      - ./frontend/public/config.js:/usr/share/nginx/html/config.js
     depends_on:
       - backend
     networks:

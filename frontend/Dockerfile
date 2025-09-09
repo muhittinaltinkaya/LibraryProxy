@@ -13,6 +13,10 @@ RUN npm install
 ARG REACT_APP_API_URL=http://localhost:5001/api
 ENV REACT_APP_API_URL=$REACT_APP_API_URL
 
+# Set WebSocket host for development server
+ENV WDS_SOCKET_HOST=0.0.0.0
+ENV WDS_SOCKET_PORT=3000
+
 # Copy source code
 COPY . .
 

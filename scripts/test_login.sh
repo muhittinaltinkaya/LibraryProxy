@@ -26,7 +26,7 @@ cat frontend/public/config.js
 
 echo ""
 echo "Container config:"
-docker-compose -f docker-compose.prod.yml exec frontend cat /app/public/config.js
+docker-compose -f docker-compose.prod.yml exec frontend cat /usr/share/nginx/html/config.js
 
 echo ""
 echo "4️⃣ Servis durumları:"
