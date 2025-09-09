@@ -159,7 +159,8 @@ export const adminApi = {
   
   updateJournal: (id: number, data: any) => api.put(`/admin/journals/${id}`, data),
   
-  deleteJournal: (id: number) => api.delete(`/admin/journals/${id}`),
+  deleteJournal: (id: number, permanent: boolean = false) => 
+    api.delete(`/admin/journals/${id}${permanent ? '?permanent=true' : ''}`),
   
   getStats: () => api.get('/admin/stats'),
   
@@ -168,6 +169,12 @@ export const adminApi = {
     per_page?: number;
     user_id?: number;
     journal_id?: number;
+    ip_address?: string;
+    start_date?: string;
+    end_date?: string;
+    status_code?: number;
+    method?: string;
+    search?: string;
   }) => api.get('/admin/access-logs', { params }),
   
   updateUserPassword: (userId: number, password: string) => 

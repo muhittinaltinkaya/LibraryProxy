@@ -51,11 +51,12 @@ const AdminJournals: React.FC = () => {
   );
 
   const deleteJournalMutation = useMutation(
-    (id: number) => adminApi.deleteJournal(id),
+    ({ id, permanent }: { id: number; permanent: boolean }) => adminApi.deleteJournal(id, permanent),
     {
-      onSuccess: () => {
+      onSuccess: (response) => {
         queryClient.invalidateQueries(['admin-journals']);
-        toast.success('Journal deleted successfully');
+        const message = response.data.message || 'Journal deleted successfully';
+        toast.success(message);
       },
       onError: (error: any) => {
         toast.error(error.response?.data?.error || 'Failed to delete journal');
@@ -68,9 +69,30 @@ const AdminJournals: React.FC = () => {
     setPage(1);
   };
 
-  const handleDeleteJournal = (journalId: number) => {
-    if (window.confirm('Are you sure you want to delete this journal?')) {
-      deleteJournalMutation.mutate(journalId);
+  const handleDeleteJournal = (journalId: number, journalName: string) => {
+    const softDeleteConfirm = window.confirm(
+      `Are you sure you want to deactivate "${journalName}"?\n\n` +
+      'This will hide the journal but keep all data.\n\n' +
+      'Click OK to deactivate, or Cancel to see permanent delete option.'
+    );
+    
+    if (softDeleteConfirm) {
+      deleteJournalMutation.mutate({ id: journalId, permanent: false });
+    } else {
+      const permanentDeleteConfirm = window.confirm(
+        `PERMANENT DELETE WARNING!\n\n` +
+        `Do you want to PERMANENTLY DELETE "${journalName}"?\n\n` +
+        'This will:\n' +
+        '• Remove the journal completely from the database\n' +
+        '• Delete all related access logs\n' +
+        '• Remove all proxy configurations\n' +
+        '• This action CANNOT be undone!\n\n' +
+        'Click OK to PERMANENTLY DELETE, or Cancel to abort.'
+      );
+      
+      if (permanentDeleteConfirm) {
+        deleteJournalMutation.mutate({ id: journalId, permanent: true });
+      }
     }
   };
 
@@ -214,7 +236,7 @@ const AdminJournals: React.FC = () => {
                             <PencilIcon className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleDeleteJournal(journal.id)}
+                            onClick={() => handleDeleteJournal(journal.id, journal.name)}
                             className="text-red-600 hover:text-red-900"
                             title="Delete Journal"
                           >

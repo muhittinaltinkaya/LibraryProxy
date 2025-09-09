@@ -335,19 +335,84 @@ def delete_journal(journal_id):
         if not journal:
             return jsonify({'error': 'Journal not found'}), 404
         
-        # Soft delete
-        deleted_journal = journal_service.delete_journal(journal_id)
+        # Check if permanent deletion is requested
+        permanent = request.args.get('permanent', 'false').lower() == 'true'
+        
+        # Delete journal (soft or permanent based on parameter)
+        deleted_journal = journal_service.delete_journal(journal_id, permanent=permanent)
         
         if not deleted_journal:
             return jsonify({'error': 'Failed to delete journal'}), 500
         
+        deletion_type = 'permanently deleted' if permanent else 'deactivated'
+        message = f'Journal {deletion_type} successfully'
+        
         return jsonify({
-            'message': 'Journal deleted successfully'
+            'message': message,
+            'permanent': permanent
         }), 200
         
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': 'Failed to delete journal', 'details': str(e)}), 500
+
+@admin_bp.route('/journals/bulk-delete', methods=['POST'])
+@jwt_required()
+@admin_required
+def bulk_delete_journals():
+    """Bulk delete journals (admin only)"""
+    try:
+        data = request.get_json()
+        
+        if not data or 'journal_ids' not in data:
+            return jsonify({'error': 'journal_ids is required'}), 400
+        
+        journal_ids = data['journal_ids']
+        permanent = data.get('permanent', False)
+        
+        if not isinstance(journal_ids, list) or not journal_ids:
+            return jsonify({'error': 'journal_ids must be a non-empty list'}), 400
+        
+        # Delete multiple journals
+        result = journal_service.delete_multiple_journals(journal_ids, permanent=permanent)
+        
+        deletion_type = 'permanently deleted' if permanent else 'deactivated'
+        message = f'{result["deleted_count"]} journals {deletion_type} successfully'
+        
+        response_data = {
+            'message': message,
+            'deleted_count': result['deleted_count'],
+            'total_requested': result['total_requested'],
+            'permanent': permanent
+        }
+        
+        if result['errors']:
+            response_data['errors'] = result['errors']
+        
+        return jsonify(response_data), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to bulk delete journals', 'details': str(e)}), 500
+
+@admin_bp.route('/journals/latest/<int:limit>', methods=['GET'])
+@jwt_required()
+@admin_required
+def get_latest_journals(limit):
+    """Get latest journals (admin only)"""
+    try:
+        if limit <= 0 or limit > 100:
+            return jsonify({'error': 'Limit must be between 1 and 100'}), 400
+        
+        journals = journal_service.get_latest_journals(limit)
+        
+        return jsonify({
+            'journals': [journal.to_dict() for journal in journals],
+            'count': len(journals)
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': 'Failed to get latest journals', 'details': str(e)}), 500
 
 @admin_bp.route('/stats', methods=['GET'])
 @jwt_required()
@@ -401,26 +466,101 @@ def get_admin_stats():
 @jwt_required()
 @admin_required
 def get_access_logs():
-    """Get access logs (admin only)"""
+    """Get access logs with comprehensive filtering (admin only)"""
     try:
+        # Pagination parameters
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 50, type=int)
+        
+        # Filter parameters
         user_id = request.args.get('user_id', type=int)
         journal_id = request.args.get('journal_id', type=int)
+        ip_address = request.args.get('ip_address', '')
+        start_date = request.args.get('start_date', '')
+        end_date = request.args.get('end_date', '')
+        status_code = request.args.get('status_code', type=int)
+        method = request.args.get('method', '')
+        search = request.args.get('search', '')
         
+        # Build query
         query = AccessLog.query
         
+        # Apply filters
         if user_id:
-            query = query.filter_by(user_id=user_id)
+            query = query.filter(AccessLog.user_id == user_id)
         
         if journal_id:
-            query = query.filter_by(journal_id=journal_id)
+            query = query.filter(AccessLog.journal_id == journal_id)
         
-        logs = query.order_by(AccessLog.timestamp.desc())\
-            .paginate(page=page, per_page=per_page, error_out=False)
+        if ip_address:
+            query = query.filter(AccessLog.ip_address.ilike(f'%{ip_address}%'))
+        
+        if start_date:
+            try:
+                from datetime import datetime
+                start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                query = query.filter(AccessLog.timestamp >= start_dt)
+            except ValueError:
+                pass  # Invalid date format, ignore filter
+        
+        if end_date:
+            try:
+                from datetime import datetime
+                end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                query = query.filter(AccessLog.timestamp <= end_dt)
+            except ValueError:
+                pass  # Invalid date format, ignore filter
+        
+        if status_code:
+            query = query.filter(AccessLog.response_status == status_code)
+        
+        if method:
+            query = query.filter(AccessLog.request_method.ilike(f'%{method}%'))
+        
+        if search:
+            # Search in multiple fields
+            search_filter = db.or_(
+                AccessLog.ip_address.ilike(f'%{search}%'),
+                AccessLog.request_path.ilike(f'%{search}%'),
+                AccessLog.user_agent.ilike(f'%{search}%')
+            )
+            query = query.filter(search_filter)
+        
+        # Order by timestamp (newest first)
+        query = query.order_by(AccessLog.timestamp.desc())
+        
+        # Paginate
+        logs = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        # Get additional info for response
+        logs_with_details = []
+        for log in logs.items:
+            log_dict = log.to_dict()
+            
+            # Add user info if available
+            if log.user_id:
+                user = User.query.get(log.user_id)
+                if user:
+                    log_dict['user'] = {
+                        'id': user.id,
+                        'username': user.username,
+                        'email': user.email
+                    }
+            
+            # Add journal info if available
+            if log.journal_id:
+                journal = Journal.query.get(log.journal_id)
+                if journal:
+                    log_dict['journal'] = {
+                        'id': journal.id,
+                        'name': journal.name,
+                        'slug': journal.slug
+                    }
+            
+            logs_with_details.append(log_dict)
         
         return jsonify({
-            'logs': [log.to_dict() for log in logs.items],
+            'logs': logs_with_details,
             'pagination': {
                 'page': logs.page,
                 'pages': logs.pages,
@@ -428,6 +568,16 @@ def get_access_logs():
                 'total': logs.total,
                 'has_next': logs.has_next,
                 'has_prev': logs.has_prev
+            },
+            'filters': {
+                'user_id': user_id,
+                'journal_id': journal_id,
+                'ip_address': ip_address,
+                'start_date': start_date,
+                'end_date': end_date,
+                'status_code': status_code,
+                'method': method,
+                'search': search
             }
         }), 200
         

@@ -80,28 +80,81 @@ class JournalService:
         
         return journal
     
-    def delete_journal(self, journal_id):
-        """Delete journal (soft delete)"""
+    def delete_journal(self, journal_id, permanent=False):
+        """Delete journal (soft delete by default, permanent if specified)"""
         journal = self.get_journal_by_id(journal_id)
         
         if not journal:
             return None
         
-        journal.is_active = False
-        journal.updated_at = datetime.utcnow()
-        db.session.commit()
+        if permanent:
+            # Permanent delete - remove from database completely
+            journal_slug = journal.slug  # Store for logging
+            
+            # First remove any related proxy configs
+            from app.models.proxy_config import ProxyConfig
+            ProxyConfig.query.filter_by(journal_id=journal_id).delete()
+            
+            # Remove any access logs related to this journal
+            from app.models.access_log import AccessLog
+            AccessLog.query.filter_by(journal_id=journal_id).delete()
+            
+            # Remove the journal itself
+            db.session.delete(journal)
+            db.session.commit()
+            
+            # Update HAProxy configuration after permanent deletion
+            try:
+                success = self.proxy_service.update_main_haproxy_config()
+                if success:
+                    self.proxy_service.reload_haproxy()
+                    print(f"HAProxy configuration automatically updated for permanent journal deletion: {journal_slug}")
+            except Exception as e:
+                print(f"Warning: Failed to update HAProxy config for permanent journal deletion {journal_slug}: {str(e)}")
+            
+            return True
+        else:
+            # Soft delete - just mark as inactive
+            journal.is_active = False
+            journal.updated_at = datetime.utcnow()
+            db.session.commit()
+            
+            # Automatically update HAProxy configuration when journal is soft deleted
+            try:
+                success = self.proxy_service.update_main_haproxy_config()
+                if success:
+                    # Reload HAProxy to apply changes
+                    self.proxy_service.reload_haproxy()
+                    print(f"HAProxy configuration automatically updated for journal soft deletion: {journal.slug}")
+            except Exception as e:
+                print(f"Warning: Failed to update HAProxy config for journal soft deletion {journal.slug}: {str(e)}")
+            
+            return journal
+    
+    def delete_multiple_journals(self, journal_ids, permanent=False):
+        """Delete multiple journals by their IDs"""
+        deleted_count = 0
+        errors = []
         
-        # Automatically update HAProxy configuration when journal is deleted
-        try:
-            success = self.proxy_service.update_main_haproxy_config()
-            if success:
-                # Reload HAProxy to apply changes
-                self.proxy_service.reload_haproxy()
-                print(f"HAProxy configuration automatically updated for journal deletion: {journal.slug}")
-        except Exception as e:
-            print(f"Warning: Failed to update HAProxy config for journal deletion {journal.slug}: {str(e)}")
+        for journal_id in journal_ids:
+            try:
+                result = self.delete_journal(journal_id, permanent=permanent)
+                if result:
+                    deleted_count += 1
+                else:
+                    errors.append(f"Journal with ID {journal_id} not found")
+            except Exception as e:
+                errors.append(f"Failed to delete journal {journal_id}: {str(e)}")
         
-        return journal
+        return {
+            'deleted_count': deleted_count,
+            'total_requested': len(journal_ids),
+            'errors': errors
+        }
+    
+    def get_latest_journals(self, limit=5):
+        """Get the latest journals by creation date"""
+        return Journal.query.order_by(Journal.created_at.desc()).limit(limit).all()
     
     def generate_proxy_config(self, journal, user):
         """Generate proxy configuration for journal access"""
