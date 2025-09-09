@@ -36,7 +36,7 @@ services:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-this-in-production-2024}
       - HAPROXY_SOCKET=/run/haproxy/admin.sock
       - PROXY_CONFIG_DIR=/app/proxy_configs
-      - CORS_ORIGINS=http://80.251.40.216:3000,http://80.251.40.216,https://80.251.40.216:3000,https://80.251.40.216
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://portal.ankara.edu.tr:3000,http://portal.ankara.edu.tr,https://portal.ankara.edu.tr:3000,https://portal.ankara.edu.tr
     volumes:
       - ./backend:/app
       - ./scripts:/app/scripts
@@ -72,11 +72,11 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
       args:
-        - REACT_APP_API_URL=http://80.251.40.216:5001/api
+        - REACT_APP_API_URL=http://portal.ankara.edu.tr:5001/api
     ports:
       - "3000:80"
-    volumes:
-      - ./frontend/public/config.js:/usr/share/nginx/html/config.js
+    # volumes:
+      # - ./frontend/public/config.js:/usr/share/nginx/html/config.js
     depends_on:
       - backend
     networks:
