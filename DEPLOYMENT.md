@@ -59,29 +59,43 @@ SECRET_KEY=your-very-strong-secret-key-2024
 ### 4. Uygulamayı Başlatın
 
 ```bash
-# Production deployment
+# Birleştirilmiş deployment scripti (önerilen)
+./scripts/deployment.sh deploy
+
+# Veya eski yöntem
 ./deploy.sh
 ```
 
-### 5. Admin Giriş Sorunu Çözme (Gerekirse)
+### 5. Sorun Giderme
 
-Eğer admin kullanıcısı ile giriş yapamıyorsanız:
-
+**Tüm sorunları çözmek için:**
 ```bash
-# Admin giriş sorununu çöz
-./fix_admin_login.sh
+# Detaylı debug
+./scripts/deployment.sh debug
+
+# Admin sorunlarını çöz
+./scripts/deployment.sh admin
+
+# Frontend'i yeniden build et
+./scripts/deployment.sh frontend
+
+# Servis durumlarını kontrol et
+./scripts/deployment.sh status
+
+# Logları izle
+./scripts/deployment.sh logs
 ```
 
-### 6. Frontend API URL Sorunu Çözme (Gerekirse)
-
-Eğer frontend hala localhost:5001'e istek gönderiyorsa:
-
+**Manuel admin yönetimi:**
 ```bash
-# Hızlı düzeltme (önerilen)
-./quick_fix_frontend.sh
+# Admin kullanıcısı oluştur/güncelle
+docker-compose -f docker-compose.prod.yml exec -T backend python /app/scripts/admin_tools.py create
 
-# Veya tam yeniden build
-./rebuild_frontend.sh
+# Admin kullanıcısını zorla oluştur
+docker-compose -f docker-compose.prod.yml exec -T backend python /app/scripts/admin_tools.py force
+
+# Veritabanı durumunu kontrol et
+docker-compose -f docker-compose.prod.yml exec -T backend python /app/scripts/admin_tools.py check
 ```
 
 ## 🌐 Erişim URL'leri

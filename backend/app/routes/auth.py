@@ -20,7 +20,6 @@ def login():
     """User login endpoint"""
     try:
         data = request.get_json()
-        print(f"Login request data: {data}")  # Debug log
         
         if not data:
             return jsonify({'error': 'No data provided'}), 400

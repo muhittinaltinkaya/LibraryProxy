@@ -134,7 +134,10 @@ cp env.production .env.prod
 
 3. **Production deployment:**
 ```bash
-# Production build ve başlatma
+# Birleştirilmiş deployment scripti
+./scripts/deployment.sh deploy
+
+# Veya eski yöntem
 ./deploy.sh
 ```
 
