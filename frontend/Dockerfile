@@ -9,6 +9,10 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install
 
+# Accept build argument for API URL
+ARG REACT_APP_API_URL=http://localhost:5001/api
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+
 # Copy source code
 COPY . .
 

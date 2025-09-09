@@ -87,7 +87,7 @@ LibProxy/
 - Node.js 18+ (geliştirme için)
 - Python 3.9+ (geliştirme için)
 
-### Hızlı Başlangıç
+### Hızlı Başlangıç (Development)
 
 1. **Projeyi klonlayın:**
 ```bash
@@ -114,6 +114,37 @@ docker-compose exec backend flask db upgrade
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:5001/api
 - **Proxy**: http://localhost:80
+
+### 🌐 Production Deployment
+
+Production sunucusuna (80.251.40.216) kurulum için:
+
+1. **Deployment dosyalarını hazırlayın:**
+```bash
+# Production environment dosyasını düzenleyin
+cp env.production .env.prod
+# Güçlü şifreler ve güvenlik anahtarları ayarlayın
+```
+
+2. **Sunucu kurulumu:**
+```bash
+# Sunucuda çalıştırın
+./server-setup.sh
+```
+
+3. **Production deployment:**
+```bash
+# Production build ve başlatma
+./deploy.sh
+```
+
+4. **Production erişim:**
+- **Frontend**: http://80.251.40.216:3000
+- **Backend API**: http://80.251.40.216:5001/api
+- **HAProxy Stats**: http://80.251.40.216:8404/stats
+- **Proxy**: http://80.251.40.216
+
+**Detaylı kurulum rehberi**: [DEPLOYMENT.md](./DEPLOYMENT.md)
 
 ### Varsayılan Admin Hesabı
 - **Kullanıcı adı**: `admin`
